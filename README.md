@@ -1,4 +1,5 @@
 Usage: python main.py
+
 enter TitleIDs separated by comma. Currently the script can't fit the entire JSON.text I have in the repository, but it contains a list of every titleID XboxUnity lists.
 
 Script will notify of an error if you search for titleids that don't have covers or titleupdates, but will still download what's available for TitleID if missing one or the other.

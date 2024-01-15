@@ -7,7 +7,7 @@ All JSON responses from Unity are saved in the respective TitleID folder for rec
 
 Issues:
 
-      Currently saves in examplefolder/
+      
 Todo:
 
       Rate-Limiting

@@ -6,7 +6,7 @@ from time import sleep
 
 # Function to save JSON response
 def save_json_response(title_id, data, json_type):
-    directory_path = f'examplefolder/{title_id}/'
+    directory_path = f'unityscrape/{title_id}/'
     os.makedirs(directory_path, exist_ok=True)
     file_path = os.path.join(directory_path, f'{json_type}_data.json')
     with open(file_path, 'w') as json_file:
@@ -45,7 +45,7 @@ def download_covers(title_id):
             if not image_response:
                 raise ValueError(f"Failed to download cover {cover_id} for title ID {title_id} after retries.")
             filename = f'{cover_id}.jpg'
-            cover_path = f'examplefolder/{title_id}/covers/'
+            cover_path = f'unityscrape/{title_id}/covers/'
             os.makedirs(cover_path, exist_ok=True)
             with open(os.path.join(cover_path, filename), 'wb') as f:
                 for chunk in image_response.iter_content(chunk_size=8192):
@@ -76,7 +76,7 @@ def download_updates(title_id):
                 if not update_response:
                     raise ValueError(f"Failed to download update {tuid} for title ID {title_id} after retries.")
                 filename = f'update_{tuid}.bin'
-                update_version_path = f'examplefolder/{title_id}/{media_id}/updateversion{version}/'
+                update_version_path = f'unityscrape/{title_id}/{media_id}/updateversion{version}/'
                 os.makedirs(update_version_path, exist_ok=True)
                 with open(os.path.join(update_version_path, filename), 'wb') as f:
                     for chunk in update_response.iter_content(chunk_size=8192):

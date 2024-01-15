@@ -18,7 +18,7 @@ def make_request_with_retries(url, max_retries=3, timeout=25, stream=False):
     retries = 0
     while retries < max_retries:
         try:
-            response = requests.get(url, timeout=timeout. stream=stream)
+            response = requests.get(url, timeout=timeout, stream=stream)
             response.raise_for_status()
             return response
         except (RequestException, Timeout) as e:

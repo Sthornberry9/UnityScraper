@@ -6,6 +6,7 @@ Script will notify of an error if you search for titleids that don't have covers
 All JSON responses from Unity are saved in the respective TitleID folder for records, and update versions are stored separately by MediaID.
 
 Todo:
+
       Rate-Limiting
 
       Fix/cleanup GUI

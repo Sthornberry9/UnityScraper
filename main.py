@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import re
 from requests.exceptions import RequestException, Timeout
 from time import sleep
 
@@ -14,7 +15,7 @@ def save_json_response(title_id, data, json_type):
     print(f"Saved {json_type} JSON response for title ID {title_id} at {file_path}")
 
 # Function to make a request with retries
-def make_request_with_retries(url, max_retries=3, timeout=25, stream=False):
+def make_request_with_retries(url, max_retries=3, timeout=10, stream=False):
     retries = 0
     while retries < max_retries:
         try:
@@ -27,6 +28,15 @@ def make_request_with_retries(url, max_retries=3, timeout=25, stream=False):
             sleep(wait)
             retries += 1
     return None
+
+# Function to extract filename from Content-Disposition header
+def get_filename_from_cd(cd):
+    if not cd:
+        return None
+    fname = re.findall('filename="?(.+)"?', cd)
+    if len(fname) == 0:
+        return None
+    return fname[0].strip().strip('"')
 
 # Function to download covers for a given titleid
 def download_covers(title_id):
@@ -44,7 +54,11 @@ def download_covers(title_id):
             image_response = make_request_with_retries(image_url, stream=True)
             if not image_response:
                 raise ValueError(f"Failed to download cover {cover_id} for title ID {title_id} after retries.")
-            filename = f'{cover_id}.jpg'
+            filename = get_filename_from_cd(image_response.headers.get('content-disposition'))
+            if not filename:
+                content_type = image_response.headers.get('content-type')
+                extension = content_type.split('/')[-1] if content_type else 'jpg'
+                filename = f'{cover_id}.{extension}'
             cover_path = f'unityscrape/{title_id}/covers/'
             os.makedirs(cover_path, exist_ok=True)
             with open(os.path.join(cover_path, filename), 'wb') as f:
@@ -75,7 +89,14 @@ def download_updates(title_id):
                 update_response = make_request_with_retries(update_url, stream=True)
                 if not update_response:
                     raise ValueError(f"Failed to download update {tuid} for title ID {title_id} after retries.")
-                filename = f'update_{tuid}.bin'
+                
+                # Extract the filename from the Content-Disposition header
+                content_disposition = update_response.headers.get('content-disposition')
+                filename = get_filename_from_cd(content_disposition)
+                if not filename:
+                    # Default to a generic name if no filename is provided
+                    filename = f'update_{tuid}.bin'
+                
                 update_version_path = f'unityscrape/{title_id}/{media_id}/updateversion{version}/'
                 os.makedirs(update_version_path, exist_ok=True)
                 with open(os.path.join(update_version_path, filename), 'wb') as f:

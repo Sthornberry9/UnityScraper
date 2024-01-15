@@ -5,6 +5,9 @@ enter TitleIDs separated by comma. Currently the script can't fit the entire JSO
 Script will notify of an error if you search for titleids that don't have covers or titleupdates, but will still download what's available for TitleID if missing one or the other.
 All JSON responses from Unity are saved in the respective TitleID folder for records, and update versions are stored separately by MediaID.
 
+Issues:
+
+      Currently saves in examplefolder/
 Todo:
 
       Rate-Limiting

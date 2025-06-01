@@ -1,131 +1,50 @@
-import os
-import requests
-import json
-import re
-from requests.exceptions import RequestException, Timeout
-from time import sleep
+#!/usr/bin/env python3
+import argparse
+import logging
+from downloader import UnityScraper
 
-# Function to save JSON response
-def save_json_response(title_id, data, json_type):
-    directory_path = f'unityscrape/{title_id}/'
-    os.makedirs(directory_path, exist_ok=True)
-    file_path = os.path.join(directory_path, f'{json_type}_data.json')
-    with open(file_path, 'w') as json_file:
-        json.dump(data, json_file, indent=4)
-    print(f"Saved {json_type} JSON response for title ID {title_id} at {file_path}")
-
-# Function to make a request with retries
-def make_request_with_retries(url, max_retries=3, timeout=10, stream=False):
-    retries = 0
-    while retries < max_retries:
-        try:
-            response = requests.get(url, timeout=timeout, stream=stream)
-            response.raise_for_status()
-            return response
-        except (RequestException, Timeout) as e:
-            wait = 2 ** retries  # exponential backoff
-            print(f"Request failed: {e}. Retrying in {wait} seconds...")
-            sleep(wait)
-            retries += 1
-    return None
-
-# Function to extract filename from Content-Disposition header
-def get_filename_from_cd(cd):
-    if not cd:
-        return None
-    fname = re.findall('filename="?(.+)"?', cd)
-    if len(fname) == 0:
-        return None
-    return fname[0].strip().strip('"')
-
-# Function to download covers for a given titleid
-def download_covers(title_id):
-    try:
-        print(f"Fetching covers for title ID {title_id}...")
-        response = make_request_with_retries(f'http://xboxunity.net/Resources/Lib/CoverInfo.php?titleid={title_id}')
-        if not response:
-            raise ValueError(f"Failed to fetch covers for title ID {title_id} after retries.")
-        covers_data = response.json()
-        save_json_response(title_id, covers_data, 'covers')
-        for cover in covers_data['Covers']:
-            cover_id = cover['CoverID']
-            print(f"Downloading cover {cover_id} for title ID {title_id}...")
-            image_url = f'http://xboxunity.net/Resources/Lib/Cover.php?size=large&cid={cover_id}'
-            image_response = make_request_with_retries(image_url, stream=True)
-            if not image_response:
-                raise ValueError(f"Failed to download cover {cover_id} for title ID {title_id} after retries.")
-            filename = get_filename_from_cd(image_response.headers.get('content-disposition'))
-            if not filename:
-                content_type = image_response.headers.get('content-type')
-                extension = content_type.split('/')[-1] if content_type else 'jpg'
-                filename = f'{cover_id}.{extension}'
-            cover_path = f'unityscrape/{title_id}/covers/'
-            os.makedirs(cover_path, exist_ok=True)
-            with open(os.path.join(cover_path, filename), 'wb') as f:
-                for chunk in image_response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"Cover {cover_id} downloaded successfully.")
-        return True
-    except Exception as e:
-        print(f"An error occurred while processing covers for title ID {title_id}: {e}")
-        return False
-
-# Function to download updates for a given titleid
-def download_updates(title_id):
-    try:
-        print(f"Fetching updates for title ID {title_id}...")
-        response = make_request_with_retries(f'http://xboxunity.net/Resources/Lib/TitleUpdateInfo.php?titleid={title_id}')
-        if not response:
-            raise ValueError(f"Failed to fetch updates for title ID {title_id} after retries.")
-        updates_data = response.json()
-        save_json_response(title_id, updates_data, 'updates')
-        for media in updates_data['MediaIDS']:
-            media_id = media['MediaID']
-            for update in media['Updates']:
-                tuid = update['TitleUpdateID']
-                version = update['Version']
-                print(f"Downloading update {tuid} version {version} for media ID {media_id} under title ID {title_id}...")
-                update_url = f'http://xboxunity.net/Resources/Lib/TitleUpdate.php?tuid={tuid}'
-                update_response = make_request_with_retries(update_url, stream=True)
-                if not update_response:
-                    raise ValueError(f"Failed to download update {tuid} for title ID {title_id} after retries.")
-                
-                # Extract the filename from the Content-Disposition header
-                content_disposition = update_response.headers.get('content-disposition')
-                filename = get_filename_from_cd(content_disposition)
-                if not filename:
-                    # Default to a generic name if no filename is provided
-                    filename = f'update_{tuid}.bin'
-                
-                update_version_path = f'unityscrape/{title_id}/{media_id}/updateversion{version}/'
-                os.makedirs(update_version_path, exist_ok=True)
-                with open(os.path.join(update_version_path, filename), 'wb') as f:
-                    for chunk in update_response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                print(f"Update {tuid} version {version} downloaded successfully.")
-        return True
-    except Exception as e:
-        print(f"An error occurred while processing updates for title ID {title_id}: {e}")
-        return False
-
-# Main script
 def main():
-    title_ids = input("Enter title IDs separated by commas: ").split(',')
-    failed_title_ids = []
+    parser = argparse.ArgumentParser(
+        description=(
+            "Download Xbox cover art & title updates for given Xbox Title IDs "
+            "via xboxunity.net. Outputs live under 'unityscrape/{title_id}/...'."
+        )
+    )
+    parser.add_argument(
+        "title_ids",
+        help=(
+            "Comma-separated Title IDs, e.g. '555308C5,00000155'. "
+            "Each ID will be processed in turn."
+        ),
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Set logging verbosity (default: INFO).",
+    )
 
-    for title_id in title_ids:
-        title_id = title_id.strip()
-        print(f"Processing title ID {title_id}...")
-        success_covers = download_covers(title_id)
-        success_updates = download_updates(title_id)
+    args = parser.parse_args()
+    # Configure root logger
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
-        if not success_covers or not success_updates:
-            failed_title_ids.append(title_id)
+    # Build a list of trimmed, nonempty Title IDs
+    title_ids = [tid.strip() for tid in args.title_ids.split(",") if tid.strip()]
+    if not title_ids:
+        print("No valid Title IDs provided. Exiting.")
+        return
 
-        print(f"Finished processing title ID {title_id}.")
+    scraper = UnityScraper()
+    failed = scraper.scrape_multiple(title_ids)
 
-    if failed_title_ids:
-        print(f"Failed to process the following title IDs: {', '.join(failed_title_ids)}")
+    if failed:
+        print(f"\nThe following Title IDs failed: {', '.join(failed)}")
+    else:
+        print("\nAll Title IDs processed successfully.")
 
 if __name__ == "__main__":
     main()
